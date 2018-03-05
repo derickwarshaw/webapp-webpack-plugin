@@ -1,65 +1,58 @@
-'use strict';
 const assert = require('assert');
 const childCompiler = require('./compiler.js');
 const oracle = require('./oracle.js');
-const util = require('./util.js');
+const {tap, tapAsync} = require('./util.js');
 
-function WebappWebpackPlugin (options) {
-  if (typeof options === 'string') {
-    options = {logo: options};
-  }
-  assert(typeof options === 'object', 'WebappWebpackPlugin options are required');
-  assert(options.logo, 'An input file is required');
-  this.options = options;
-  this.options.prefix = this.options.prefix || 'assets-[hash]/';
-  this.options.favicons = this.options.favicons || {};
-  this.options.inject = (this.options.inject !== undefined) ? this.options.inject : true;
-}
+module.exports = class WebappWebpackPlugin {
+  constructor (args) {
+    const options = (typeof args === 'string') ? {logo: args} : args;
+    assert(typeof options === 'object' && typeof options.logo === 'string', 'An input file is required');
 
-WebappWebpackPlugin.prototype.apply = function (compiler) {
-  if (!this.options.favicons.appName) {
-    this.options.favicons.appName = oracle.guessAppName(compiler.context);
+    this.options = Object.assign({
+      prefix: 'assets-[hash]/',
+      favicons: {},
+      inject: true,
+    }, options);
   }
 
-  if (!this.options.favicons.appDescription) {
-    this.options.favicons.appDescription = oracle.guessDescription(compiler.context);
-  }
+  apply(compiler) {
+    const {
+      appName = oracle.guessAppName(compiler.context),
+      appDescription = oracle.guessDescription(compiler.context),
+      version = oracle.guessVersion(compiler.context),
+      developerName = oracle.guessDeveloperName(compiler.context),
+      developerURL = oracle.guessDeveloperURL(compiler.context),
+    } = this.options.favicons;
 
-  if (!this.options.favicons.version) {
-    this.options.favicons.version = oracle.guessVersion(compiler.context);
-  }
+    Object.assign(this.options.favicons, {
+      appName,
+      appDescription,
+      version,
+      developerName,
+      developerURL,
+    });
 
-  if (!this.options.favicons.developerName) {
-    this.options.favicons.developerName = oracle.guessDeveloperName(compiler.context);
-  }
+    tap(compiler, 'compilation', 'WebappWebpackPlugin', () => {
+      tapAsync(compiler, 'make', 'WebappWebpackPlugin', async (compilation, callback) => {
+        try {
+          // Generate favicons
+          const result = await childCompiler.run(this.options, compiler.context, compilation);
 
-  if (!this.options.favicons.developerURL) {
-    this.options.favicons.developerURL = oracle.guessDeveloperURL(compiler.context);
-  }
+          if (this.options.inject) {
+            // Hook into the html-webpack-plugin processing and add the html
+            tap(compilation, 'html-webpack-plugin-before-html-processing', 'WebappWebpackPluginInjection', (htmlPluginData) => {
+              if (htmlPluginData.plugin.options.favicons !== false) {
+                htmlPluginData.html = htmlPluginData.html.replace(/(<\/head>)/i, result.sort().join('') + '$&');
+              }
+              return htmlPluginData;
+            });
+          }
 
-  // Generate favicons
-  let compilationResult;
-  util.tapAsync(compiler, 'make', 'WebappWebpackPlugin', (compilation, callback) => {
-    childCompiler.compileTemplate(this.options, compiler.context, compilation)
-      .then((result) => {
-        compilationResult = result;
-        callback();
-      })
-      .catch(callback);
-  });
-
-  // Hook into the html-webpack-plugin processing
-  // and add the html
-  if (this.options.inject) {
-    util.tap(compiler, 'compilation', 'HtmlWebpackPluginHooks', (compilation) => {
-      util.tapAsync(compilation, 'html-webpack-plugin-before-html-processing', 'WebappWebpackPluginInjection', (htmlPluginData, callback) => {
-        if (htmlPluginData.plugin.options.favicons !== false) {
-          htmlPluginData.html = htmlPluginData.html.replace(/(<\/head>)/i, compilationResult.sort().join('') + '$&');
+          return callback();
+        } catch (e) {
+          return callback(e);
         }
-        callback(null, htmlPluginData);
       });
     });
   }
-};
-
-module.exports = WebappWebpackPlugin;
+}

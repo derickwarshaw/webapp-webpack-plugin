@@ -1,13 +1,13 @@
-import test from 'ava';
-import WebappWebpackPlugin from '../src/';
+const test = require('ava');
+const WebappWebpackPlugin = require('../src/');
 
-import {logo} from './util';
+const {logo} = require('./util');
 
 test('should throw error when called without arguments', t => {
   try {
     new WebappWebpackPlugin();
   } catch (err) {
-    t.is(err.message, 'WebappWebpackPlugin options are required');
+    t.is(err.message, 'An input file is required');
   }
 });
 

@@ -1,9 +1,9 @@
-import test from 'ava';
-import path from 'path';
-import fs from 'fs-extra';
-import WebappWebpackPlugin from '../src/';
+const test = require('ava');
+const path = require('path');
+const fs = require('fs-extra');
+const WebappWebpackPlugin = require('../src/');
 
-import {logo, generate, compare, expected} from './util';
+const {logo, generate, compare, expected} = require('./util');
 
 test('should generate the expected default result', async t => {
   const stats = await generate([new WebappWebpackPlugin({logo})]);

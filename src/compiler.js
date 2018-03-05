@@ -1,69 +1,43 @@
-'use strict';
 const path = require('path');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
+const {tap, tapAsync} = require('./util.js');
 
-const util = require('./util.js');
-
-module.exports.compileTemplate = function compileTemplate (options, context, compilation) {
+module.exports.run = ({prefix, favicons: params, logo}, context, compilation) => {
   // The entry file is just an empty helper as the dynamic template
   // require is added in "loader.js"
-  const outputOptions = {
-    filename: '[hash]',
-    publicPath: compilation.outputOptions.publicPath
-  };
+  const filename = logo;
+  const publicPath = compilation.outputOptions.publicPath;
+
   // Create an additional child compiler which takes the template
   // and turns it into an Node.JS html factory.
   // This allows us to use loaders during the compilation
-  const childCompiler = compilation.createChildCompiler('webapp-webpack-plugin', outputOptions);
-  childCompiler.context = context;
-  new SingleEntryPlugin(context, '!!' + require.resolve('./favicons.js') + '?' +
-    JSON.stringify({
-      outputFilePrefix: options.prefix,
-      faviconsOptions: options.favicons,
-    }) + '!' + options.logo
-  ).apply(childCompiler);
+  const compiler = compilation.createChildCompiler('webapp-webpack-plugin', {filename, publicPath});
+  compiler.context = context;
 
-  util.tap(childCompiler, 'compilation', 'Favicons', (compilation) => {
-    util.tapAsync(compilation, 'optimize-chunk-assets', 'Favicons', (chunks, callback) => {
-      if (!chunks[0]) {
-        return callback(compilation.errors[0] || 'Favicons generation failed');
-      }
-      const resultFile = chunks[0].files[0];
-      const resultCode = compilation.assets[resultFile].source();
-      try {
-        const resultJson = JSON.stringify(eval(resultCode));
-        compilation.assets[resultFile] = {
-          source: () => resultJson,
-          size: () => resultJson.length
-        };
-        callback(null);
-      } catch (e) {
-        return callback(e);
-      }
-    });
-  });
+  const loader = require.resolve('./favicons.js');
+  const query = JSON.stringify({prefix, params});
+  new SingleEntryPlugin(context, `!!${loader}?${query}!${logo}`).apply(compiler);
 
   // Compile and return a promise
   return new Promise((resolve, reject) => {
-    childCompiler.runAsChild((err, entries, childCompilation) => {
-      if (childCompilation && childCompilation.errors && childCompilation.errors.length) {
-        const errorDetails = childCompilation.errors.map((error) =>
-          error.message + (error.error ? ':\n' + error.error : '')
-        ).join('\n');
-        reject(new Error('Child compilation failed:\n' + errorDetails));
-      } else if (err) {
-        reject(err);
-      } else {
-        // Replace [hash] placeholders in filename
-        const outputName = util.getAssetPath(compilation.mainTemplate, outputOptions.filename, {
-          hash: childCompilation.hash,
-          chunk: entries[0]
-        });
+    compiler.runAsChild((err, _, childCompilation = {}) => {
+      if (err) {
+        return reject(err);
+      }
 
-        const stats = JSON.parse(childCompilation.assets[outputName].source());
-        delete compilation.assets[outputName];
-        childCompilation.assets = {};
-        resolve(stats);
+      const {errors = [], assets = {}} = childCompilation;
+      childCompilation.assets = {}; // avoid duplicated output
+
+      if (errors.length) {
+        const details = errors.map(({message, error}) => message + (error ? ':\n' + error : '')).join('\n');
+        return reject(new Error('Child compilation failed:\n' + details));
+      }
+
+      try {
+        delete compilation.assets[filename];
+        return resolve(eval(assets[filename].source()));
+      } catch (e) {
+        return reject(e);
       }
     });
   });
