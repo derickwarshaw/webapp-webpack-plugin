@@ -34,8 +34,8 @@ jobs:
   - stage: deploy
     os: linux
     node_js: node
-    install: skip
-    script: skip
+    install: travis_retry npm install
+    script: npm run build
     deploy:
       provider: npm
       email: brunocodutra@gmail.com

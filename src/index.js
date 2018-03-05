@@ -1,8 +1,8 @@
 'use strict';
 const assert = require('assert');
-const childCompiler = require('./lib/compiler.js');
-const oracle = require('./lib/oracle.js');
-const util = require('./lib/util.js');
+const childCompiler = require('./compiler.js');
+const oracle = require('./oracle.js');
+const util = require('./util.js');
 
 function WebappWebpackPlugin (options) {
   if (typeof options === 'string') {
