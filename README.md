@@ -36,7 +36,9 @@ The default configuration will automatically generate webapp manifest files alon
 [44 different icon formats](https://github.com/brunocodutra/webapp-webpack-plugin/tree/master/test/fixtures/expected/default/assets)
 as appropriate for iOS devices, Android devices, Windows Phone and various desktop browsers out of your single `my-logo.png`.
 
-### Pro Tip
+> **Tip:** You might want to [fine tune](#advanced-usage) what vendors to support.
+
+### HTML Injection
 
 In combination with [html-webpack-plugin](https://github.com/ampedandwired/html-webpack-plugin) it will also inject the necessary html for you:
 
@@ -90,16 +92,19 @@ plugins: [
     logo: 'my-logo.png',
     // The prefix for all image files (might be a folder or a name)
     prefix: 'icons-[hash]/',
-    // Inject the html into the html-webpack-plugin
+    // Inject html links/metadata (requires html-webpack-plugin)
     inject: true,
 
-    // Favicons configuration options (see https://github.com/haydenbleasel/favicons#usage)
+    // Favicons configuration options (see below)
     favicons: {
       ...
     }
   })
 ]
 ```
+
+To fine tune what icons/metadata is generated, refer to
+[favicons' usage instructions](https://github.com/haydenbleasel/favicons#usage).
 
 For example:
 
